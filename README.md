@@ -39,30 +39,37 @@ Jeśli konfiguracja gry nie została jeszcze przeprowadzona na tym komputerze:
    ```
 4. Uruchom grę, naciśnij **F11**, znajdź widget **HTTP API Server v2** i upewnij się, że jest włączony (oznaczony na zielono).
 
-### Krok 2: Instalacja zależności serwera Flask
-W katalogu głównym projektu (`agy-bar`) zainstaluj wymagane biblioteki Pythona.
+### Krok 2: Aktywacja środowiska wirtualnego i instalacja zależności
+Projekt wykorzystuje środowisko wirtualne `.venv` znajdujące się w głównym katalogu. Przed uruchomieniem serwera musisz je aktywować i zainstalować wymagane zależności.
 
-Jeśli korzystasz z wbudowanego środowiska wirtualnego `.venv` znajdującego się w projekcie:
-```powershell
-# Aktywacja środowiska wirtualnego w systemie Windows (PowerShell)
-.\.venv\Scripts\activate
+1. **Aktywuj środowisko wirtualne** w zależności od Twojego systemu i powłoki (terminala):
+   - **Windows (PowerShell - zalecane)**:
+     ```powershell
+     .\.venv\Scripts\activate
+     ```
+     *(Jeśli napotkasz błąd bezpieczeństwa skryptów, uruchom najpierw: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process`)*
+   - **Windows (Klasyczny Wiersz Poleceń - CMD)**:
+     ```cmd
+     .venv\Scripts\activate.bat
+     ```
+   - **Linux / macOS (Bash/Zsh)**:
+     ```bash
+     source .venv/bin/activate
+     ```
 
-# Instalacja zależności (jeśli nie były zainstalowane)
-pip install Flask requests
-```
-
-Jeśli nie chcesz korzystać ze środowiska wirtualnego, zainstaluj globalnie:
-```powershell
-pip install Flask requests
-```
+2. **Zainstaluj wymagane biblioteki** wewnątrz aktywnego środowiska:
+   ```bash
+   pip install Flask requests
+   ```
 
 ### Krok 3: Uruchomienie serwera Flask
-Uruchom serwer za pomocą Pythona z głównego folderu projektu:
+Po pomyślnej aktywacji środowiska wirtualnego (nazwa powłoki w terminalu będzie poprzedzona tagiem `(.venv)`), uruchom serwer Flask:
 ```powershell
 python app.py
 ```
-Powinieneś zobaczyć komunikat w terminalu informujący, że serwer działa pod adresem:
+Serwer uruchomi się lokalnie pod adresem:
 `* Running on http://127.0.0.1:5000`
+
 
 ### Krok 4: Wyświetlenie pięknych statystyk
 1. Otwórz przeglądarkę internetową i przejdź pod adres:

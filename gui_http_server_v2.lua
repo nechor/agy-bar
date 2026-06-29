@@ -1,4 +1,4 @@
-local version = "1.2.1"
+local version = "1.2.2"
 
 function widget:GetInfo()
   return {

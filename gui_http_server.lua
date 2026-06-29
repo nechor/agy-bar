@@ -15,6 +15,19 @@ end
 local socket = require("socket")
 local server
 
+local function json_escape(str)
+  if not str then return '""' end
+  local escaped = str:gsub('\\', '\\\\')
+                     :gsub('"', '\\"')
+                     :gsub('\n', '\\n')
+                     :gsub('\r', '\\r')
+                     :gsub('\t', '\\t')
+                     :gsub('\b', '\\b')
+                     :gsub('\f', '\\f')
+  escaped = escaped:gsub('[%c]', '')
+  return '"' .. escaped .. '"'
+end
+
 -- Simple Lua-to-JSON encoder helper to keep the widget self-contained and dependency-free.
 local function to_json(val)
   local t = type(val)
@@ -23,7 +36,7 @@ local function to_json(val)
   elseif t == "boolean" then
     return val and "true" or "false"
   elseif t == "string" then
-    return string.format("%q", val)
+    return json_escape(val)
   elseif t == "table" then
     -- Check if it's an array
     local is_array = true

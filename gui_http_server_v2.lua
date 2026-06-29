@@ -1,4 +1,4 @@
-local version = "1.2.3"
+local version = "1.2.4"
 
 function widget:GetInfo()
   return {
@@ -25,6 +25,19 @@ local frameCounter = 0
 local frameThrottle = 8 -- Poll socket every 8 frames (approx 8-15 times per second)
 
 
+local function json_escape(str)
+  if not str then return '""' end
+  local escaped = str:gsub('\\', '\\\\')
+                     :gsub('"', '\\"')
+                     :gsub('\n', '\\n')
+                     :gsub('\r', '\\r')
+                     :gsub('\t', '\\t')
+                     :gsub('\b', '\\b')
+                     :gsub('\f', '\\f')
+  escaped = escaped:gsub('[%c]', '')
+  return '"' .. escaped .. '"'
+end
+
 -- Simple Lua-to-JSON encoder helper
 local function to_json(val)
   local t = type(val)
@@ -33,7 +46,7 @@ local function to_json(val)
   elseif t == "boolean" then
     return val and "true" or "false"
   elseif t == "string" then
-    return string.format("%q", val)
+    return json_escape(val)
   elseif t == "table" then
     local is_array = true
     local max_idx = 0

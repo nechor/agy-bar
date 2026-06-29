@@ -1,4 +1,4 @@
-local version = "1.2.2"
+local version = "1.2.3"
 
 function widget:GetInfo()
   return {
@@ -86,6 +86,12 @@ local lastInitAttemptTime = 0
 local function InitializeServer()
   if server then return true end
 
+  -- If we are in the loading screen (frame < 0), do not initialize yet to avoid Windows SO_REUSEADDR port stealing issues
+  local frame = Spring.GetGameFrame()
+  if not frame or frame < 0 then
+    return false
+  end
+
   -- Resolve global socket via environment table getfenv(1) to avoid local shadowing
   local env = getfenv(1)
   if env then
@@ -117,6 +123,7 @@ local function InitializeServer()
   Spring.Echo("HTTP API Server v2: Successfully started on http://127.0.0.1:8540")
   return true
 end
+
 
 function widget:Initialize()
   Spring.Echo("HTTP API Server v2: Initializing fully-featured server...")

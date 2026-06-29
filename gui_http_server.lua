@@ -65,6 +65,12 @@ local lastInitAttemptTime = 0
 local function InitializeServer()
   if server then return true end
 
+  -- If we are in the loading screen (frame < 0), do not initialize yet to avoid Windows SO_REUSEADDR port stealing issues
+  local frame = Spring.GetGameFrame()
+  if not frame or frame < 0 then
+    return false
+  end
+
   if not socket then
     Spring.Echo("HTTP API Server: ERROR - socket library not available")
     return false

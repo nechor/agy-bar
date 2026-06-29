@@ -84,10 +84,10 @@ Serwer uruchomi się lokalnie pod adresem:
 
 ---
 
-## Historia Optymalizacji i Szczegóły Techniczne (Wersja v1.2.2)
+## Historia Optymalizacji i Szczegóły Techniczne (Wersja v1.2.3)
 
 W celu wyeliminowania mikro-przycięć (stuttering) gry w trybie wieloosobowym oraz zapewnienia płynnego automatycznego uruchamiania wdrożono następujące usprawnienia w widgecie Lua:
-* **Autostart & Pre-game Connection Handling (Obsługa pre-game):** Widget akceptuje połączenia i zwraca bezpieczny stan oczekiwania, kiedy gra znajduje się w fazie ładowania (`frame < 0`). Zapobiega to przepełnianiu kolejki połączeń TCP (Backlog) i eliminuje potrzebę ręcznego restartowania UI komendą `/luaui reload`. Dodano również automatyczne próby bindowania portu co 5 sekund na wypadek, gdyby podsystem sieciowy gry nie był gotowy przy starcie.
+* **Autostart & Pre-game Connection Handling (Obsługa pre-game):** Widget akceptuje połączenia i zwraca bezpieczny stan oczekiwania, kiedy gra znajduje się w fazie ładowania. Aby uniknąć specyficznych dla Windowsa problemów z współdzieleniem portów (`SO_REUSEADDR` port-sharing/stealing) podczas automatycznego przeładowywania stanu LuaUI na ekranie ładowania, inicjalizacja serwera i powiązanie gniazda TCP są opóźnione do momentu zakończenia ekranu ładowania (`frame >= 0`). Zapobiega to przepełnianiu kolejki połączeń TCP (Backlog) i eliminuje potrzebę ręcznego restartowania UI komendą `/luaui reload`. Dodano również automatyczne próby bindowania portu co 5 sekund na wypadek, gdyby podsystem sieciowy gry nie był gotowy przy starcie.
 * **UnitDef Cache (Buforowanie definicji):** Statyczne atrybuty jednostek (np. koszty, kategorie, tiery, dopasowania nazw) są obliczane tylko raz przy napotkaniu typu jednostki i buforowane. Zapobiega to ciągłemu narzutowi procesora na dopasowywanie stringów i przeszukiwanie tabel silnika gry.
 * **Socket Polling Throttling (Ograniczenie częstotliwości sieci):** Nasłuchiwanie gniazda TCP (`socket.select`) zostało ograniczone do co 8 klatki gry (zamiast w każdej klatce), co oszczędza do 85% czasu procesora traconego na bezczynne odpytywanie sieci w wątku gry.
 * **Early Filtering (Wczesne filtrowanie):** Szczegółowe dane (pozycja, komendy, zdrowie) są serializowane wyłącznie dla jednostek gracza lokalnego. Dla wrogów i sojuszników pobierany jest tylko koszt metalu, co redukuje rozmiar JSON-a z 1MB do 3-5KB.

@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BAR Sci-Fi HUD Analytics</title>
+  <!-- Google Fonts: Orbitron & Share Tech Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for real-time graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <style>
+    :root {
+      --bg-color: #020308;
+      --panel-bg: rgba(6, 9, 22, 0.85);
+      --border-color: #1a2238;
+      
+      --neon-cyan: #00f0ff;
+      --neon-green: #39ff14;
+      --neon-orange: #ffb700;
+      --neon-red: #ff0055;
+      --neon-purple: #b980ff;
+      
+      --text-main: #e2e8f0;
+      --text-muted: #64748b;
+      
+      --hud-glow: 0 0 12px rgba(0, 240, 255, 0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Share Tech Mono', monospace;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 10px;
+      height: 100vh;
+      overflow: hidden;
+      /* Subtle Sci-Fi Grid Overlay */
+      background-image: 
+        linear-gradient(rgba(18, 24, 45, 0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(18, 24, 45, 0.3) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    /* Outer Wrapper */
+    .hud-grid {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      height: calc(100vh - 20px);
+      gap: 10px;
+    }
+
+    /* Sci-Fi HUD Panel styling */
+    .hud-panel {
+      background: var(--panel-bg);
+      border: 1px solid #2d3d66; /* Sharper, brighter panel boundary */
+      border-radius: 4px;
+      padding: 8px 12px;
+      position: relative;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0, 240, 255, 0.02);
+    }
+
+    /* Angled Sci-Fi corners decoration */
+    .hud-panel::before {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      width: 8px;
+      height: 8px;
+      border-top: 2px solid var(--neon-cyan);
+      border-left: 2px solid var(--neon-cyan);
+    }
+
+    .hud-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      right: -1px;
+      width: 8px;
+      height: 8px;
+      border-bottom: 2px solid var(--neon-cyan);
+      border-right: 2px solid var(--neon-cyan);
+    }
+
+    /* Top HUD Header */
+    header.hud-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 16px;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .header-title {
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      font-size: 16px;
+      letter-spacing: 2px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .header-title span {
+      color: var(--neon-cyan);
+      font-size: 13px;
+      font-weight: normal;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .hud-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      color: var(--neon-red);
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .hud-status.online {
+      color: var(--neon-green);
+    }
+
+    .status-pulse {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulse-glow 1.5s infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    /* Mini KPI Row (Super Compact) */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+
+    .kpi-box {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.01);
+      padding: 4px 10px;
+    }
+
+    .kpi-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .kpi-value {
+      font-size: 16px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    /* Main Dashboard Layout */
+    .main-hud-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr 340px;
+      gap: 10px;
+      min-height: 0; /* Important for nested scrolls */
+    }
+
+    /* Columns settings */
+    .hud-col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .hud-section-header {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Scroll containers inside panels */
+    .hud-scroll {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .hud-scroll::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .hud-scroll::-webkit-scrollbar-thumb {
+      background: rgba(0, 240, 255, 0.2);
+    }
+
+    /* Resource Display */
+    .res-section {
+      margin-bottom: 10px;
+    }
+
+    .res-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .res-bar-outer {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      margin-bottom: 6px;
+    }
+
+    .res-bar-inner {
+      height: 100%;
+      width: 0%;
+      box-shadow: 0 0 6px currentColor;
+    }
+
+    .res-grid-compact {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.01);
+      padding: 3px;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+    }
+
+    /* Chart Container (Highly compressed) */
+    .hud-chart-box {
+      height: 80px;
+      margin-top: 5px;
+      position: relative;
+    }
+
+    /* Super Compact Sci-Fi Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    th, td {
+      padding: 4px 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+      text-align: left;
+    }
+
+    th {
+      color: var(--text-muted);
+      font-weight: normal;
+      background: rgba(0,0,0,0.3);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tr:hover td {
+      background: rgba(0, 240, 255, 0.04);
+    }
+
+    /* Armies composition list */
+    .comp-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 6px;
+      font-size: 12px;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.03);
+    }
+
+    .comp-qty {
+      color: var(--neon-cyan);
+      font-weight: bold;
+    }
+
+    /* Terminal Console logs */
+    .console-line {
+      font-size: 11px;
+      line-height: 1.3;
+      padding: 3px 6px;
+      border-left: 2px solid transparent;
+      margin-bottom: 2px;
+      background: rgba(255, 255, 255, 0.005);
+    }
+
+    .console-line.warn {
+      border-left-color: var(--neon-orange);
+      color: #ffe494;
+    }
+
+    .console-line.err {
+      border-left-color: var(--neon-red);
+      color: #ff9494;
+    }
+
+    .console-time {
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+
+    /* Warning box banner (floating/overlay at top if offline) */
+    #offline-overlay {
+      display: none;
+      background: rgba(255, 0, 85, 0.15);
+      border: 1px solid var(--neon-red);
+      color: #ffb3c1;
+      padding: 4px 10px;
+      font-size: 11px;
+      text-align: center;
+      position: absolute;
+      top: 40px;
+      left: 10px;
+      right: 10px;
+      z-index: 999;
+      box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+    }
+    /* Tree view styling */
+    .tree-tier-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      min-height: 0;
+      height: 100%;
+    }
+    .tree-tier {
+      border-radius: 4px;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.4);
+    }
+    .tree-tier.tier-1 {
+      border: 1px solid rgba(0, 240, 255, 0.22);
+      background: rgba(0, 240, 255, 0.015);
+    }
+    .tree-tier.tier-1 .tree-tier-header {
+      color: var(--neon-cyan);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.3);
+    }
+    .tree-tier.tier-2 {
+      border: 1px solid rgba(255, 183, 0, 0.22);
+      background: rgba(255, 183, 0, 0.015);
+    }
+    .tree-tier.tier-2 .tree-tier-header {
+      color: var(--neon-orange);
+      border-bottom: 1px solid rgba(255, 183, 0, 0.3);
+    }
+    .tree-tier.tier-3 {
+      border: 1px solid rgba(185, 128, 255, 0.22);
+      background: rgba(185, 128, 255, 0.015);
+    }
+    .tree-tier.tier-3 .tree-tier-header {
+      color: var(--neon-purple);
+      border-bottom: 1px solid rgba(185, 128, 255, 0.3);
+    }
+    .tree-tier-header {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      padding-bottom: 3px;
+    }
+    .tree-type-section {
+      margin-left: 6px;
+      margin-bottom: 8px;
+    }
+    .tree-type-header {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 10px;
+      font-weight: bold;
+      color: var(--neon-green);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tree-type-header.buildings {
+      color: var(--neon-orange);
+    }
+    .tree-role-section {
+      margin-left: 10px;
+      margin-bottom: 4px;
+    }
+    .tree-role-header {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+      display: grid;
+      grid-template-columns: 1fr 42px 10px;
+      gap: 4px;
+      align-items: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      padding-bottom: 2px;
+      margin-right: 4px;
+    }
+    .role-power-val {
+      font-family: 'Share Tech Mono', monospace;
+      font-weight: bold;
+      color: #ffffff;
+      font-size: 11px;
+      text-align: right;
+    }
+    .role-power-type {
+      font-family: 'Share Tech Mono', monospace;
+      font-weight: bold;
+      color: #ffffff;
+      font-size: 11px;
+      text-align: center;
+    }
+    .tree-unit-row {
+      display: grid;
+      grid-template-columns: auto 1fr 32px 42px 10px;
+      gap: 4px;
+      align-items: center;
+      font-size: 11px;
+      padding: 2px 4px;
+      margin-left: 8px;
+    }
+    .tree-unit-name {
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+    .tree-unit-dots {
+      border-bottom: 1px dotted rgba(255, 255, 255, 0.07);
+      height: 8px;
+      width: 100%;
+    }
+    .tree-unit-count {
+      color: var(--neon-cyan);
+      font-weight: bold;
+      text-align: right;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .tree-unit-power-val {
+      color: var(--text-muted); /* Dimmed value for units */
+      font-weight: normal;
+      text-align: right;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .tree-unit-power-type {
+      color: rgba(255, 255, 255, 0.25); /* Even more dimmed type letter */
+      font-weight: bold;
+      text-align: center;
+      font-size: 9px;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    /* Ally Team Intelligence Panel (Ultra compact horizontal rows) */
+    .ally-header-row {
+      display: grid;
+      grid-template-columns: 1fr 75px 80px 75px;
+      gap: 6px;
+      font-size: 9px;
+      font-family: 'Share Tech Mono', monospace;
+      font-weight: bold;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 4px 6px;
+      letter-spacing: 1px;
+    }
+    .ally-header-row span {
+      text-align: right;
+    }
+    .ally-header-row span:first-child {
+      text-align: left;
+    }
+    .ally-row-compact {
+      display: grid;
+      grid-template-columns: 1fr 75px 80px 75px;
+      gap: 6px;
+      align-items: center;
+      font-size: 11px; /* Matches log console font size */
+      padding: 3px 6px;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.05);
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .ally-row-compact.local-player {
+      background: rgba(0, 240, 255, 0.04);
+      border-left: 2px solid var(--neon-cyan);
+    }
+    .ally-row-compact .ally-name {
+      font-weight: bold;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ally-row-compact .ally-stat {
+      text-align: right;
+      font-weight: bold;
+    }
+    .ally-row-compact .ally-stat.cyan { color: var(--neon-cyan); }
+    .ally-row-compact .ally-stat.orange { color: var(--neon-orange); }
+    .ally-row-compact .ally-stat.red { color: var(--neon-red); }
+  </style>
+</head>
+<body>
+
+  <div class="hud-grid">
+    
+    <!-- Connection alert -->
+    <div id="offline-overlay">
+      [ WARNING ] BAR API OFFLINE - CHECK GAME AND WIDGET CONFIGURATION
+    </div>
+
+    <!-- Header Panel -->
+    <header class="hud-panel">
+      <div class="header-title">
+        BAR HUD ANALYTICS <span id="hud-map-val">// NO_MAP_LOADED</span>
+      </div>
+      <div id="hud-status" class="hud-status">
+        <span class="status-pulse"></span>
+        <span class="status-text">OFFLINE</span>
+      </div>
+    </header>
+
+    <!-- Mini KPI stats row -->
+    <div class="hud-panel kpi-row">
+      <div class="kpi-box">
+        <span class="kpi-label">SYS TIME</span>
+        <span class="kpi-value" id="kpi-time">--:--</span>
+      </div>
+      <div class="kpi-box">
+        <span class="kpi-label">FRAME</span>
+        <span class="kpi-value" id="kpi-frame">--</span>
+      </div>
+      <div class="kpi-box">
+        <span class="kpi-label">MY UNITS</span>
+        <span class="kpi-value" id="kpi-units" style="color: var(--neon-green);">0</span>
+      </div>
+      <div class="kpi-box">
+        <span class="kpi-label">SEL UNITS</span>
+        <span class="kpi-value" id="kpi-selected" style="color: var(--neon-cyan);">0</span>
+      </div>
+      <div class="kpi-box">
+        <span class="kpi-label">WIND CURRENT</span>
+        <span class="kpi-value" id="kpi-wind" style="color: var(--neon-orange);">0.0</span>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-hud-layout">
+      
+      <!-- Left Column: Economy System (3 Separate stacked panels) -->
+      <div class="hud-col" style="display: flex; flex-direction: column; gap: 10px; min-height: 0;">
+        
+        <!-- Metal Module -->
+        <div class="hud-panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 6px 10px;">
+          <div class="hud-section-header" style="margin-bottom: 4px;">
+            <span>[ METAL_SYSTEM ]</span>
+          </div>
+          <div class="res-section" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+            <div class="res-meta">
+              <span style="color: var(--neon-cyan); font-weight: bold;">METAL</span>
+              <span id="met-storage-text">-- / --</span>
+            </div>
+            <div class="res-bar-outer">
+              <div id="met-bar-fill" class="res-bar-inner" style="background-color: var(--neon-cyan); color: var(--neon-cyan);"></div>
+            </div>
+            <div class="res-grid-compact">
+              <div>INC: <span id="met-inc" style="color: var(--neon-green);">+0.0</span></div>
+              <div>EXP: <span id="met-exp" style="color: var(--neon-red);">-0.0</span></div>
+              <div>PULL: <span id="met-pull">0.0</span></div>
+            </div>
+            <div class="hud-chart-box">
+              <canvas id="metChartMini"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Energy Module -->
+        <div class="hud-panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 6px 10px;">
+          <div class="hud-section-header" style="margin-bottom: 4px;">
+            <span>[ ENERGY_SYSTEM ]</span>
+          </div>
+          <div class="res-section" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+            <div class="res-meta">
+              <span style="color: var(--neon-orange); font-weight: bold;">ENERGY</span>
+              <span id="nrg-storage-text">-- / --</span>
+            </div>
+            <div class="res-bar-outer">
+              <div id="nrg-bar-fill" class="res-bar-inner" style="background-color: var(--neon-orange); color: var(--neon-orange);"></div>
+            </div>
+            <div class="res-grid-compact">
+              <div>INC: <span id="nrg-inc" style="color: var(--neon-green);">+0.0</span></div>
+              <div>EXP: <span id="nrg-exp" style="color: var(--neon-red);">-0.0</span></div>
+              <div>PULL: <span id="nrg-pull">0.0</span></div>
+            </div>
+            <div class="hud-chart-box">
+              <canvas id="nrgChartMini"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wind Module -->
+        <div class="hud-panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 6px 10px;">
+          <div class="hud-section-header" style="margin-bottom: 4px;">
+            <span>[ WIND_SYSTEM ]</span>
+          </div>
+          <div class="res-section" style="flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+            <div class="res-meta">
+              <span style="color: var(--neon-purple); font-weight: bold;">WIND POTENTIAL</span>
+              <span id="wind-minmax-text">-- / --</span>
+            </div>
+            <div class="res-bar-outer">
+              <div id="wind-bar-fill" class="res-bar-inner" style="background-color: var(--neon-purple); color: var(--neon-purple);"></div>
+            </div>
+            <div class="res-grid-compact" style="grid-template-columns: repeat(2, 1fr);">
+              <div>CURRENT: <span id="wind-curr-val" style="color: var(--neon-purple);">0.0</span></div>
+              <div>RANGE: <span id="wind-range-val">--</span></div>
+            </div>
+            <div class="hud-chart-box">
+              <canvas id="windChartMini"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Middle Column: Grouped Unit Registry (HUD tree style) -->
+      <div class="hud-panel hud-col">
+        <div class="hud-section-header">
+          <span>[ MY_UNIT_REGISTRY ]</span>
+          <span id="hud-unit-totals">TOTAL: 0</span>
+        </div>
+        <div class="hud-scroll" id="hud-units-tree-body">
+          <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 30px;">NO DATA LINK ACTIVE</div>
+        </div>
+      </div>
+
+      <!-- Right Column: Team Comparison & Terminal Console -->
+      <div class="hud-col" style="display: flex; flex-direction: column; gap: 10px; min-height: 0;">
+        
+        <!-- Team Intelligence Panel -->
+        <div class="hud-panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+          <div class="hud-section-header">
+            <span>[ ALLY_TEAM_INTELLIGENCE ]</span>
+          </div>
+          <div class="ally-header-row">
+            <span>NAME</span>
+            <span class="cyan">METAL</span>
+            <span class="orange">ENERGY</span>
+            <span class="red">THREAT</span>
+          </div>
+          <div class="hud-scroll" id="hud-ally-comparison">
+            <div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 20px;">NO TEAM DATA LINK</div>
+          </div>
+        </div>
+
+        <!-- Terminal Console Panel -->
+        <div class="hud-panel" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+          <div class="hud-section-header">
+            <span>[ LOG_CONSOLE_FEED ]</span>
+          </div>
+          <div class="hud-scroll" id="hud-terminal">
+            <div style="color: var(--text-muted); font-size: 11px; padding: 10px;">NO CONSOLE LOG FEED</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    const apiEndpoint = "/api/data";
+    const historyLimit = 30; // 30 seconds
+
+    const chartLabels = Array(historyLimit).fill("");
+    const metIncHist = Array(historyLimit).fill(0);
+    const metExpHist = Array(historyLimit).fill(0);
+    const nrgIncHist = Array(historyLimit).fill(0);
+    const nrgExpHist = Array(historyLimit).fill(0);
+    const windHist = Array(historyLimit).fill(0);
+
+    // Compact Charts
+    const metChart = new Chart(document.getElementById('metChartMini').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: chartLabels,
+        datasets: [
+          { data: metIncHist, borderColor: '#39ff14', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
+          { data: metExpHist, borderColor: '#ff0055', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { display: false },
+          y: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b', font: { size: 9, family: 'Share Tech Mono' } } }
+        }
+      }
+    });
+
+    const nrgChart = new Chart(document.getElementById('nrgChartMini').getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: chartLabels,
+        datasets: [
+          { data: nrgIncHist, borderColor: '#ffb700', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false },
+          { data: nrgExpHist, borderColor: '#ff0055', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { display: false },
+          y: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#64748b', font: { size: 9, family: 'Share Tech Mono' } } }
+        }
+      }
+    });
+
+    // Create wind chart vertical gradient (soft neon theme)
+    const ctxWind = document.getElementById('windChartMini').getContext('2d');
+    const gradientWind = ctxWind.createLinearGradient(0, 105, 0, 0); // 105 is height of box
+    gradientWind.addColorStop(0, 'rgba(255, 0, 85, 0.38)');    // Bottom: bright soft neon red
+    gradientWind.addColorStop(0.5, 'rgba(245, 158, 11, 0.38)'); // Middle: bright soft neon yellow
+    gradientWind.addColorStop(1, 'rgba(57, 255, 20, 0.38)');    // Top: bright soft neon green
+
+    const windChart = new Chart(ctxWind, {
+      type: 'line',
+      data: {
+        labels: chartLabels,
+        datasets: [
+          { 
+            data: windHist, 
+            borderColor: '#b980ff', // Bright light purple border line
+            backgroundColor: gradientWind,
+            borderWidth: 1.5, // Subtle visible line stroke
+            pointRadius: 0, 
+            tension: 0.2, 
+            fill: true 
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { display: false },
+          y: { min: 0, max: 25, grid: { color: 'rgba(255, 255, 255, 0.06)' }, ticks: { color: '#94a3b8', font: { size: 9, family: 'Share Tech Mono' } } }
+        }
+      },
+      plugins: [{
+        id: 'horizontalLines',
+        afterDraw: (chart) => {
+          const ctx = chart.ctx;
+          const yScale = chart.scales.y;
+          if (!yScale) return;
+
+          const drawDashedLine = (value, color, label) => {
+            const y = yScale.getPixelForValue(value);
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([4, 4]); // Dashed style
+            ctx.moveTo(chart.chartArea.left, y);
+            ctx.lineTo(chart.chartArea.right, y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Label text
+            ctx.font = '8px Share Tech Mono';
+            ctx.fillStyle = color;
+            ctx.fillText(label, chart.chartArea.left + 5, y - 3);
+            ctx.restore();
+          };
+
+          if (window.currentMapMax) {
+            drawDashedLine(window.currentMapMax, 'rgba(255, 0, 85, 0.75)', `MAP MAX: ${window.currentMapMax}`);
+          }
+          if (window.currentMapAvg) {
+            drawDashedLine(window.currentMapAvg, 'rgba(0, 240, 255, 0.75)', `MAP AVG: ${window.currentMapAvg.toFixed(1)}`);
+          }
+        }
+      }]
+    });
+
+    function formatTime(secs) {
+      const m = Math.floor(secs / 60);
+      const s = Math.floor(secs % 60);
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    async function tick() {
+      try {
+        const response = await fetch(apiEndpoint);
+        if (!response.ok) throw new Error();
+        const data = await response.json();
+
+        // Online State
+        document.getElementById("hud-status").className = "hud-status online";
+        document.getElementById("hud-status").querySelector(".status-text").textContent = "ONLINE";
+        document.getElementById("offline-overlay").style.display = "none";
+
+        // Map and game context
+        document.getElementById("hud-map-val").textContent = `// MAP: ${data.game.mapName.toUpperCase()}`;
+        document.getElementById("kpi-time").textContent = formatTime(data.game.seconds);
+        document.getElementById("kpi-frame").textContent = `${data.game.frame} (${data.game.speed}x)`;
+
+        // Resources - Metal
+        if (data.resources && data.resources.metal) {
+          const m = data.resources.metal;
+          document.getElementById("met-storage-text").textContent = `${Math.floor(m.storage)}/${Math.floor(m.capacity)}`;
+          document.getElementById("met-inc").textContent = `+${m.income.toFixed(1)}`;
+          document.getElementById("met-exp").textContent = `-${m.expense.toFixed(1)}`;
+          document.getElementById("met-pull").textContent = m.pull.toFixed(1);
+          document.getElementById("met-bar-fill").style.width = Math.min((m.storage / m.capacity) * 100, 100) + "%";
+
+          metIncHist.shift(); metIncHist.push(m.income);
+          metExpHist.shift(); metExpHist.push(m.expense);
+        }
+
+        // Resources - Energy
+        if (data.resources && data.resources.energy) {
+          const e = data.resources.energy;
+          document.getElementById("nrg-storage-text").textContent = `${Math.floor(e.storage)}/${Math.floor(e.capacity)}`;
+          document.getElementById("nrg-inc").textContent = `+${e.income.toFixed(1)}`;
+          document.getElementById("nrg-exp").textContent = `-${e.expense.toFixed(1)}`;
+          document.getElementById("nrg-pull").textContent = e.pull.toFixed(1);
+          document.getElementById("nrg-bar-fill").style.width = Math.min((e.storage / e.capacity) * 100, 100) + "%";
+
+          nrgIncHist.shift(); nrgIncHist.push(e.income);
+          nrgExpHist.shift(); nrgExpHist.push(e.expense);
+        }
+
+        // Wind
+        if (data.environment && data.environment.wind) {
+          const w = data.environment.wind;
+          document.getElementById("kpi-wind").textContent = w.current.toFixed(1);
+          
+          // Wind Section details
+          document.getElementById("wind-minmax-text").textContent = `${Math.floor(w.current)} / ${Math.floor(w.max)}`;
+          document.getElementById("wind-curr-val").textContent = w.current.toFixed(1);
+          document.getElementById("wind-range-val").textContent = `${w.min.toFixed(0)} - ${w.max.toFixed(0)}`;
+          
+          const windPercent = Math.min(Math.max(((w.current - w.min) / (w.max - w.min || 1)) * 100, 0), 100);
+          document.getElementById("wind-bar-fill").style.width = windPercent + "%";
+
+          // Set map wind bounds for custom grid plugin
+          window.currentMapMax = w.max;
+          window.currentMapAvg = (w.min + w.max) / 2;
+
+          windHist.shift();
+          windHist.push(w.current);
+        }
+
+        // Update Charts
+        metChart.update('none');
+        nrgChart.update('none');
+        windChart.update('none');
+
+        // Selected Units
+        document.getElementById("kpi-selected").textContent = data.selectedUnits ? data.selectedUnits.length : 0;
+
+        // Process units lists into tree hierarchy
+        const treeContainer = document.getElementById("hud-units-tree-body");
+        const myTeamId = data.localPlayer.teamId;
+        
+        let myUnitsCount = 0;
+
+        if (data.units && data.units.length > 0) {
+          const hierarchy = {};
+
+          data.units.forEach(u => {
+            const isMine = u.team === myTeamId;
+            if (isMine) {
+              myUnitsCount++;
+            } else {
+              return; // Show only my units
+            }
+
+            const tier = u.techLevel || 1;
+            const typeKey = u.isBuilding ? "buildings" : "moving";
+            const role = u.category || "utility";
+            const name = u.humanName || u.defName;
+
+            if (!hierarchy[tier]) {
+              hierarchy[tier] = { moving: {}, buildings: {} };
+            }
+            if (!hierarchy[tier][typeKey][role]) {
+              hierarchy[tier][typeKey][role] = {
+                units: {},
+                totalThreat: 0,
+                totalBuild: 0,
+                totalValue: 0
+              };
+            }
+            const group = hierarchy[tier][typeKey][role];
+            if (!group.units[name]) {
+              group.units[name] = { count: 0, metalCost: u.metalCost || 0, buildSpeed: u.buildSpeed || 0 };
+            }
+            group.units[name].count++;
+
+            if (role === "combat") {
+              group.totalThreat += (u.metalCost || 0);
+            } else if (role === "build") {
+              group.totalBuild += (u.buildSpeed || 0);
+            } else {
+              group.totalValue += (u.metalCost || 0);
+            }
+          });
+
+          // Render tree structure
+          treeContainer.innerHTML = "";
+          
+          const containerDiv = document.createElement("div");
+          containerDiv.className = "tree-tier-container";
+
+          [1, 2, 3].forEach(tier => {
+            const tierDiv = document.createElement("div");
+            tierDiv.className = "tree-tier tier-" + tier;
+            tierDiv.innerHTML = `<div class="tree-tier-header">[ TIER ${tier} - TECH_${tier} ]</div>`;
+
+            const tierData = hierarchy[tier];
+            if (tierData) {
+              ["moving", "buildings"].forEach(typeKey => {
+                const typeData = tierData[typeKey];
+                if (!typeData || Object.keys(typeData).length === 0) return;
+
+                const typeSec = document.createElement("div");
+                typeSec.className = "tree-type-section";
+                
+                const isMoving = typeKey === "moving";
+                const typeTitle = isMoving ? "+ MOVING UNITS" : "+ BUILDINGS";
+                const headerClass = isMoving ? "tree-type-header" : "tree-type-header buildings";
+                typeSec.innerHTML = `<div class="${headerClass}">${typeTitle}</div>`;
+
+                let typeHasChildren = false;
+
+                const formatPower = (val) => {
+                  if (val >= 1000) return (val / 1000).toFixed(1) + "K";
+                  return val.toFixed(0);
+                };
+
+                ["combat", "economy", "utility", "build"].forEach(role => {
+                  const roleData = typeData[role];
+                  if (!roleData || Object.keys(roleData.units).length === 0) return;
+
+                  typeHasChildren = true;
+                  let powerValStr = "";
+                  let powerType = "";
+                  if (role === "combat") {
+                    powerValStr = formatPower(roleData.totalThreat);
+                    powerType = "T";
+                  } else if (role === "build") {
+                    powerValStr = formatPower(roleData.totalBuild);
+                    powerType = "B";
+                  } else {
+                    powerValStr = formatPower(roleData.totalValue);
+                    powerType = "V";
+                  }
+
+                  const roleSec = document.createElement("div");
+                  roleSec.className = "tree-role-section";
+                  roleSec.innerHTML = `
+                    <div class="tree-role-header">
+                      <span>> ${role.toUpperCase()}</span>
+                      <span class="role-power-val">${powerValStr}</span>
+                      <span class="role-power-type">${powerType}</span>
+                    </div>
+                  `;
+
+                  Object.entries(roleData.units).sort((a, b) => {
+                    const countA = a[1].count;
+                    const countB = b[1].count;
+                    const valA = role === "build" ? (a[1].buildSpeed * countA) : (a[1].metalCost * countA);
+                    const valB = role === "build" ? (b[1].buildSpeed * countB) : (b[1].metalCost * countB);
+                    if (valB !== valA) {
+                      return valB - valA; // Descending order
+                    }
+                    return a[0].localeCompare(b[0]); // Alphabetical fallback
+                  }).forEach(([name, info]) => {
+                    const count = info.count;
+                    const powerType = role === "combat" ? "T" : role === "build" ? "B" : "V";
+                    const rawVal = role === "build" ? (info.buildSpeed * count) : (info.metalCost * count);
+                    const powerValStr = formatPower(rawVal);
+
+                    const row = document.createElement("div");
+                    row.className = "tree-unit-row";
+                    row.innerHTML = `
+                      <span class="tree-unit-name">${name}</span>
+                      <span class="tree-unit-dots"></span>
+                      <span class="tree-unit-count">${count}X</span>
+                      <span class="tree-unit-power-val">${powerValStr}</span>
+                      <span class="tree-unit-power-type">${powerType}</span>
+                    `;
+                    roleSec.appendChild(row);
+                  });
+                  
+                  typeSec.appendChild(roleSec);
+                });
+
+                if (typeHasChildren) {
+                  tierDiv.appendChild(typeSec);
+                }
+              });
+            } else {
+              const placeholder = document.createElement("div");
+              placeholder.style.color = "var(--text-muted)";
+              placeholder.style.fontSize = "11px";
+              placeholder.style.textAlign = "center";
+              placeholder.style.marginTop = "20px";
+              placeholder.textContent = "NO DATA LINK";
+              tierDiv.appendChild(placeholder);
+            }
+
+            containerDiv.appendChild(tierDiv);
+          });
+
+          treeContainer.appendChild(containerDiv);
+
+          document.getElementById("hud-unit-totals").textContent = "TOTAL: " + myUnitsCount;
+
+        } else {
+          document.getElementById("hud-unit-totals").textContent = "TOTAL: 0";
+          treeContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 30px;">NO DATA LINK ACTIVE</div>`;
+        }
+        document.getElementById("kpi-units").textContent = myUnitsCount;
+
+        document.getElementById("kpi-units").textContent = myUnitsCount;
+
+        // Allied Players comparison rendering
+        const allyContainer = document.getElementById("hud-ally-comparison");
+        const localAllyTeamId = data.localPlayer.allyTeamId;
+        const localTeamId = data.localPlayer.teamId;
+
+        if (data.teams) {
+          allyContainer.innerHTML = "";
+          
+          const sortedTeams = Object.entries(data.teams)
+            .filter(([tIDStr, t]) => t.allyTeamId === localAllyTeamId && !t.spectator)
+            .sort((a, b) => {
+              const threatA = a[1].threat || 0;
+              const threatB = b[1].threat || 0;
+              if (threatB !== threatA) {
+                return threatB - threatA; // Sort by threat power descending
+              }
+              // Fallback to local team first
+              const aID = parseInt(a[0]);
+              const bID = parseInt(b[0]);
+              if (aID === localTeamId) return -1;
+              if (bID === localTeamId) return 1;
+              return aID - bID;
+            });
+
+          if (sortedTeams.length > 0) {
+            sortedTeams.forEach(([tIDStr, teamData]) => {
+              const playerName = teamData.name || "BOT_" + tIDStr;
+              const isLocal = parseInt(tIDStr) === localTeamId;
+
+              const mInc = teamData.resources.metal.income;
+              const eInc = teamData.resources.energy.income;
+              const threat = teamData.threat || 0;
+
+              const formatVal = (val) => {
+                if (val >= 1000) return (val / 1000).toFixed(1) + "K";
+                return val.toFixed(1); // Always 1 decimal place for perfect alignment
+              };
+
+              const row = document.createElement("div");
+              row.className = isLocal ? "ally-row-compact local-player" : "ally-row-compact";
+              row.innerHTML = `
+                <span class="ally-name">${playerName} ${isLocal ? "(You)" : ""}</span>
+                <span class="ally-stat cyan">+${formatVal(mInc)}</span>
+                <span class="ally-stat orange">+${formatVal(eInc)}</span>
+                <span class="ally-stat red">${formatVal(threat)}</span>
+              `;
+              allyContainer.appendChild(row);
+            });
+          } else {
+            allyContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 11px; text-align: center; padding: 20px;">NO ALLIED TEAMS DETECTED</div>`;
+          }
+        }
+
+        // Terminal Log Console
+        const termContainer = document.getElementById("hud-terminal");
+        if (data.console && data.console.length > 0) {
+          const autoScroll = termContainer.scrollHeight - termContainer.clientHeight <= termContainer.scrollTop + 30;
+          termContainer.innerHTML = "";
+          data.console.forEach(l => {
+            const line = document.createElement("div");
+            let statusClass = "";
+            if (l.level >= 40) statusClass = "err";
+            else if (l.level >= 30) statusClass = "warn";
+            
+            line.className = `console-line ${statusClass}`;
+            line.innerHTML = `<span class="console-time">[${formatTime(l.time)}]</span><span>${l.text}</span>`;
+            termContainer.appendChild(line);
+          });
+          if (autoScroll) termContainer.scrollTop = termContainer.scrollHeight;
+        } else {
+          termContainer.innerHTML = `<div style="color: var(--text-muted); font-size: 11px; padding: 10px;">NO CONSOLE LOG FEED</div>`;
+        }
+
+      } catch (e) {
+        document.getElementById("hud-status").className = "hud-status";
+        document.getElementById("hud-status").querySelector(".status-text").textContent = "OFFLINE";
+        document.getElementById("offline-overlay").style.display = "block";
+      }
+    }
+
+    setInterval(tick, 1000);
+    tick();
+  </script>
+</body>
+</html>

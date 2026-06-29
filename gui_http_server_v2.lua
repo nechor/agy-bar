@@ -132,7 +132,7 @@ function widget:Shutdown()
 end
 
 function widget:Update()
-  -- Safety checks: Only process API requests when server is set up and game is ready (frame >= 0)
+  -- Safety checks: Only process API requests when server is set up
   if not server then
     local now = os.clock()
     if now - lastInitAttemptTime > 5 then
@@ -146,9 +146,6 @@ function widget:Update()
   -- Throttle execution to run once every 8 frames (reduces constant polling CPU waste)
   frameCounter = frameCounter + 1
   if frameCounter % frameThrottle ~= 0 then return end
-  
-  local frame = Spring.GetGameFrame()
-  if not frame or frame < 0 then return end
 
   -- Accept incoming connections (non-blocking)
   local client, err = server:accept()
@@ -161,6 +158,44 @@ function widget:Update()
       
       if method == "GET" then
         local data = {}
+        local frame = Spring.GetGameFrame()
+        
+        if not frame or frame < 0 then
+          -- Minimal loading state to empty backlog and keep socket alive
+          data.game = {
+            frame = frame or -1,
+            seconds = 0,
+            speed = 1,
+            paused = true,
+            mapName = "Loading...",
+            modName = "Loading...",
+          }
+          data.localPlayer = { playerId = -1, teamId = -1, allyTeamId = -1 }
+          data.resources = {
+            metal = { storage = 0, capacity = 0, excess = 0, income = 0, expense = 0, pull = 0 },
+            energy = { storage = 0, capacity = 0, excess = 0, income = 0, expense = 0, pull = 0 }
+          }
+          data.environment = {
+            wind = { min = 0, max = 25, current = 0 },
+            mapSize = { x = 0, z = 0 }
+          }
+          data.players = {}
+          data.teams = {}
+          data.units = {}
+          data.selectedUnits = {}
+          data.console = consoleHistory
+          
+          local json_body = to_json(data)
+          local response = "HTTP/1.1 200 OK\r\n" ..
+                           "Content-Type: application/json\r\n" ..
+                           "Access-Control-Allow-Origin: *\r\n" ..
+                           "Content-Length: " .. string.len(json_body) .. "\r\n" ..
+                           "Connection: close\r\n\r\n" ..
+                           json_body
+          client:send(response)
+          client:close()
+          return
+        end
 
         -- 1. Game general state (highly defensive)
         data.game = {

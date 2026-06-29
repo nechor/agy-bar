@@ -60,26 +60,51 @@ local function to_json(val)
   end
 end
 
-function widget:Initialize()
+local lastInitAttemptTime = 0
+
+local function InitializeServer()
+  if server then return true end
+
+  if not socket then
+    Spring.Echo("HTTP API Server: ERROR - socket library not available")
+    return false
+  end
+
   -- Bind to localhost:8540
-  server = socket.bind("127.0.0.1", 8540)
+  local err
+  server, err = socket.bind("127.0.0.1", 8540)
   if not server then
     Spring.Echo("HTTP API Server: ERROR - Failed to bind to 127.0.0.1:8540")
-    return
+    return false
   end
   server:settimeout(0) -- Set to non-blocking
   Spring.Echo("HTTP API Server: Successfully started on http://127.0.0.1:8540")
+  return true
+end
+
+function widget:Initialize()
+  Spring.Echo("HTTP API Server: Initializing server...")
+  InitializeServer()
 end
 
 function widget:Shutdown()
   if server then
     server:close()
     Spring.Echo("HTTP API Server: Stopped")
+    server = nil
   end
 end
 
 function widget:Update()
-  if not server then return end
+  if not server then
+    local now = os.clock()
+    if now - lastInitAttemptTime > 5 then
+      lastInitAttemptTime = now
+      Spring.Echo("HTTP API Server: Server not running, retrying initialization...")
+      InitializeServer()
+    end
+    if not server then return end
+  end
 
   -- Accept incoming connections (non-blocking)
   local client, err = server:accept()

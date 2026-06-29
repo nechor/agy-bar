@@ -81,9 +81,11 @@ function widget:AddConsoleLine(line, level)
   end
 end
 
-function widget:Initialize()
-  Spring.Echo("HTTP API Server v2: Initializing fully-featured server...")
-  
+local lastInitAttemptTime = 0
+
+local function InitializeServer()
+  if server then return true end
+
   -- Resolve global socket via environment table getfenv(1) to avoid local shadowing
   local env = getfenv(1)
   if env then
@@ -101,7 +103,7 @@ function widget:Initialize()
 
   if not socket then
     Spring.Echo("HTTP API Server v2: ERROR - Sockets are not available.")
-    return
+    return false
   end
 
   -- Bind to localhost:8540
@@ -109,22 +111,37 @@ function widget:Initialize()
   server, err = socket.bind("127.0.0.1", 8540)
   if not server then
     Spring.Echo("HTTP API Server v2: ERROR - Failed to bind to 127.0.0.1:8540. Error: " .. tostring(err))
-    return
+    return false
   end
   server:settimeout(0) -- Set to non-blocking
   Spring.Echo("HTTP API Server v2: Successfully started on http://127.0.0.1:8540")
+  return true
+end
+
+function widget:Initialize()
+  Spring.Echo("HTTP API Server v2: Initializing fully-featured server...")
+  InitializeServer()
 end
 
 function widget:Shutdown()
   if server then
     server:close()
     Spring.Echo("HTTP API Server v2: Stopped")
+    server = nil
   end
 end
 
 function widget:Update()
   -- Safety checks: Only process API requests when server is set up and game is ready (frame >= 0)
-  if not server then return end
+  if not server then
+    local now = os.clock()
+    if now - lastInitAttemptTime > 5 then
+      lastInitAttemptTime = now
+      Spring.Echo("HTTP API Server v2: Server not running, retrying initialization...")
+      InitializeServer()
+    end
+    if not server then return end
+  end
   
   -- Throttle execution to run once every 8 frames (reduces constant polling CPU waste)
   frameCounter = frameCounter + 1

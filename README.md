@@ -1,60 +1,85 @@
-# Beyond All Reason (BAR) HTTP API Server Widget
+# Beyond All Reason (BAR) HTTP API Server & HUD Analytics Dashboard
 
-Ten projekt zawiera prosty serwer HTTP wbudowany w widget Lua do gry **Beyond All Reason (BAR)**. Serwer nasłuchuje lokalnie na porcie `8540` i zwraca szczegółowe dane o stanie gry, zaznaczonych jednostkach oraz surowcach w formacie JSON.
-
-## Zawartość Projektu
-
-1. [gui_http_server_v2.lua](file:///C:/Users/dariu/agy/bor/gui_http_server_v2.lua) - Główny widget LuaUI, który należy umieścić w folderze widgetów gry.
-2. [socket.lua](file:///C:/Users/dariu/agy/bor/socket.lua) - Poprawiona, bezpieczna dla piaskownicy wersja pliku pomocniczego LuaSocket.
+Ten projekt pozwala na wyświetlanie pięknych statystyk i analityki w czasie rzeczywistym z Twojej rozgrywki w grze **Beyond All Reason (BAR)**. Dane są pobierane bezpośrednio z silnika gry za pomocą wbudowanego serwera HTTP w Lua, a następnie serwowane i wizualizowane na nowoczesnym panelu HUD napisanym we Flasku i HTML5 (z użyciem biblioteki Chart.js).
 
 ---
 
-## Co trzeba było zrobić, aby to zadziałało? (Krok po kroku)
+## Jak to działa?
 
-### Krok 1: Włączenie obsługi gniazd sieciowych (Sockets) w silniku gry
-Silnik Recoil/Spring domyślnie blokuje obsługę sieci w widgetach ze względów bezpieczeństwa. 
-W pliku konfiguracyjnym gry:
-`%localappdata%\Programs\Beyond-All-Reason\data\springsettings.cfg`
-dodano wpis:
-```ini
-LuaSocketEnabled = 1
+Projekt składa się z dwóch głównych komponentów współpracujących ze sobą:
+1. **Lua HTTP API Server Widget (`gui_http_server_v2.lua`)**:
+   - Działa bezpośrednio w silniku gry BAR.
+   - Uruchamia lokalne gniazdo sieciowe (socket) i nasłuchuje na porcie `8540` w formacie JSON.
+   - Zwraca surowe dane o gospodarce, strukturze jednostek gracza oraz statystykach sojuszników.
+2. **Serwer Flask (`app.py` & `templates/index.html`)**:
+   - Uruchamia lokalną aplikację webową na porcie `5000`.
+   - Odpytuje serwer w grze (proxy na porcie `8540`) i przesyła dane do przeglądarki, zapobiegając problemom z CORS.
+   - Renderuje interaktywny interfejs w stylu Sci-Fi HUD z wykresami metalu, energii, wiatru, drzewem jednostek i konsolą logów.
+
+---
+
+## Wymagania wstępne
+
+Aby uruchomić aplikację Flask, musisz mieć zainstalowany **Python 3**.
+
+---
+
+## Instrukcja Uruchomienia Krok po Kroku
+
+### Krok 1: Instalacja i konfiguracja widgetu w grze BAR
+Jeśli konfiguracja gry nie została jeszcze przeprowadzona na tym komputerze:
+
+1. Skopiuj plik [gui_http_server_v2.lua](file:///C:/Users/dariu/agy/agy-bar/gui_http_server_v2.lua) do folderu widgetów gry BAR:
+   `%localappdata%\Programs\Beyond-All-Reason\data\LuaUI\Widgets\`
+2. Skopiuj plik [socket.lua](file:///C:/Users/dariu/agy/agy-bar/socket.lua) do głównego folderu danych gry BAR (aby naprawić domyślny błąd silnika Recoil):
+   `%localappdata%\Programs\Beyond-All-Reason\data\`
+3. Otwórz plik `%localappdata%\Programs\Beyond-All-Reason\data\springsettings.cfg` i dodaj/zmień linię:
+   ```ini
+   LuaSocketEnabled = 1
+   ```
+4. Uruchom grę, naciśnij **F11**, znajdź widget **HTTP API Server v2** i upewnij się, że jest włączony (oznaczony na zielono).
+
+### Krok 2: Instalacja zależności serwera Flask
+W katalogu głównym projektu (`agy-bar`) zainstaluj wymagane biblioteki Pythona.
+
+Jeśli korzystasz z wbudowanego środowiska wirtualnego `.venv` znajdującego się w projekcie:
+```powershell
+# Aktywacja środowiska wirtualnego w systemie Windows (PowerShell)
+.\.venv\Scripts\activate
+
+# Instalacja zależności (jeśli nie były zainstalowane)
+pip install Flask requests
 ```
 
-### Krok 2: Naprawienie błędu silnika w `socket.lua`
-Wbudowany w silnik gry plik `socket.lua` (odpowiedzialny za moduł LuaSocket) wysypywał się na starcie gry z błędem `attempt to index global '_G' (a nil value)`. Piaskownica silnika gry całkowicie blokuje dostęp do globalnej tabeli `_G` (zwraca `nil`).
-* **Rozwiązanie:** Stworzono poprawioną wersję pliku `socket.lua`, która nie używa `_G`, lecz bezpiecznego lokalnego słownika z wymaganymi funkcjami systemowymi Lua (`type`, `error`, `tostring` itp.).
-* Plik ten został umieszczony w głównej ścieżce zapisu danych gry `%localappdata%\Programs\Beyond-All-Reason\data\socket.lua`, aby nadpisać wersję spakowaną w archiwum silnika.
+Jeśli nie chcesz korzystać ze środowiska wirtualnego, zainstaluj globalnie:
+```powershell
+pip install Flask requests
+```
 
-### Krok 3: Rozwiązanie problemu przesłaniania zmiennych w widgecie
-W pliku widgetu wywołanie `local socket = socket` na samym początku pliku (w fazie kompilacji pliku) powodowało przypisanie wartości `nil`, ponieważ silnik wstrzykuje globalne zmienne środowiskowe dopiero tuż przed wywołaniem `widget:Initialize()`. Dodatkowo zmienna lokalna `local socket` przesłaniała zmienną globalną.
-* **Rozwiązanie:** Odwoływanie się do biblioteki socket zostało przeniesione do wewnątrz funkcji `widget:Initialize()`, a sam obiekt jest pobierany za pomocą `getfenv(1).socket` lub `getfenv(1).Socket`, co omija problem przesłaniania zmiennych.
+### Krok 3: Uruchomienie serwera Flask
+Uruchom serwer za pomocą Pythona z głównego folderu projektu:
+```powershell
+python app.py
+```
+Powinieneś zobaczyć komunikat w terminalu informujący, że serwer działa pod adresem:
+`* Running on http://127.0.0.1:5000`
 
-### Krok 4: Wymuszenie włączenia widgetu w konfiguracji profilu
-Silnik gry po wykryciu błędu podczas pierwszego ładowania widgetu automatycznie wyłącza go i zapisuje jego stan jako `0` (wyłączony) w konfiguracji profilu użytkownika:
-`%localappdata%\Programs\Beyond-All-Reason\data\LuaUI\Config\BYAR.lua`
-* **Rozwiązanie:** Wartości zamówienia (order) dla widgetu zostały zmodyfikowane w pliku konfiguracyjnym:
-  ```lua
-  ["HTTP API Server v2"] = 200,
-  ```
-  Aby zapobiec nadpisaniu pliku przez grający silnik z pamięci RAM podczas przeładowania, plik `BYAR.lua` został tymczasowo ustawiony jako **Tylko do odczytu (Read-Only)** przed wykonaniem `/luaui reload`, a po pomyślnym załadowaniu przywrócono mu pełne uprawnienia zapisu.
-
----
-
-## Jak zainstalować ponownie na innym komputerze?
-
-1. Skopiuj plik `gui_http_server_v2.lua` do:
-   `%localappdata%\Programs\Beyond-All-Reason\data\LuaUI\Widgets\`
-2. Skopiuj plik `socket.lua` do:
-   `%localappdata%\Programs\Beyond-All-Reason\data\`
-3. Otwórz `%localappdata%\Programs\Beyond-All-Reason\data\springsettings.cfg` i dodaj:
-   `LuaSocketEnabled = 1`
-4. Uruchom grę, naciśnij **F11**, znajdź widget **HTTP API Server v2** i upewnij się, że jest włączony (zielony).
+### Krok 4: Wyświetlenie pięknych statystyk
+1. Otwórz przeglądarkę internetową i przejdź pod adres:
+   [http://127.0.0.1:5000/](http://127.0.0.1:5000/)
+2. Uruchom grę Beyond All Reason i wejdź do dowolnego meczu (np. potyczka z botami lub gra multiplayer).
+3. Panel automatycznie połączy się z grą i zacznie w czasie rzeczywistym rysować wykresy oraz aktualizować sekcje:
+   - **METAL_SYSTEM** & **ENERGY_SYSTEM** (wykresy przychodu vs wydatków)
+   - **WIND_SYSTEM** (wykres aktualnej siły wiatru z naniesionymi liniami optymalności dla elektrowni wiatrowych)
+   - **MY_UNIT_REGISTRY** (struktura Twoich jednostek z podziałem na Tiery i role)
+   - **ALLY_TEAM_INTELLIGENCE** (porównanie zasobów i zagrożenia sojuszników)
+   - **LOG_CONSOLE_FEED** (ostatnie logi bezpośrednio z silnika gry)
 
 ---
 
-## Historia Optymalizacji i Zmian (Wydanie v1.2.1)
+## Historia Optymalizacji i Szczegóły Techniczne (Wersja v1.2.1)
 
-W celu wyeliminowania mikro-przycięć (stuttering) gry w trybie wieloosobowym wdrożono następujące usprawnienia:
+W celu wyeliminowania mikro-przycięć (stuttering) gry w trybie wieloosobowym wdrożono następujące usprawnienia w widgecie Lua:
 * **UnitDef Cache (Buforowanie definicji):** Statyczne atrybuty jednostek (np. koszty, kategorie, tiery, dopasowania nazw) są obliczane tylko raz przy napotkaniu typu jednostki i buforowane. Zapobiega to ciągłemu narzutowi procesora na dopasowywanie stringów i przeszukiwanie tabel silnika gry.
 * **Socket Polling Throttling (Ograniczenie częstotliwości sieci):** Nasłuchiwanie gniazda TCP (`socket.select`) zostało ograniczone do co 8 klatki gry (zamiast w każdej klatce), co oszczędza do 85% czasu procesora traconego na bezczynne odpytywanie sieci w wątku gry.
 * **Early Filtering (Wczesne filtrowanie):** Szczegółowe dane (pozycja, komendy, zdrowie) są serializowane wyłącznie dla jednostek gracza lokalnego. Dla wrogów i sojuszników pobierany jest tylko koszt metalu, co redukuje rozmiar JSON-a z 1MB do 3-5KB.

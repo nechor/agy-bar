@@ -22,9 +22,10 @@ def get_data():
                 "message": f"Game widget returned status {response.status_code}"
             }), 502
     except requests.exceptions.RequestException as e:
+        print(f"Flask API Error: {e}")
         return jsonify({
             "status": "error",
-            "message": "Nie można połączyć się z grą. Upewnij się, że Beyond All Reason jest uruchomiony, mecz trwa, a widget 'HTTP API Server v2' jest włączony (F11)."
+            "message": f"Nie można połączyć się z grą. Błąd: {str(e)}"
         }), 503
 
 if __name__ == "__main__":

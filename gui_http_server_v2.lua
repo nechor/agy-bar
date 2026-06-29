@@ -86,9 +86,9 @@ local lastInitAttemptTime = 0
 local function InitializeServer()
   if server then return true end
 
-  -- If we are in the loading screen (frame < 0), do not initialize yet to avoid Windows SO_REUSEADDR port stealing issues
-  local frame = Spring.GetGameFrame()
-  if not frame or frame < 0 then
+  -- Delay initialization until player is fully loaded in-game to prevent socket conflicts on Windows during loading screen reloads
+  local myPlayerID = Spring.GetMyPlayerID()
+  if not myPlayerID or myPlayerID < 0 then
     return false
   end
 
